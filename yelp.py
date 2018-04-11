@@ -10,17 +10,24 @@ import requests
 import secrets
 
 class Restaurant:
-	def __init__(self, id, desc, address, phone, price, hours, url, categories, business_info, similar):
+	def __init__(self, id, name, rating, desc, address, phone, price, hours, url, categories, business_info, similar):
 		self.id = id
+		self.name = name
+		self.rating = rating
 		self.address = address
 		self.phone = phone
-		self.categories = []
+		self.categories = categories
 		self.url = url
 		self.price = len(price)
 		self.hours = hours
 		self.desc = desc
 		self.business_info = business_info
 		self.similar = similar
+
+	def insert_str(self):
+		return '''
+			INSERT INTO "Restaurants" VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}")
+		'''.format(self.id, self.name, self.rating, self.desc, self.address, self.phone, self.price, self.hours, self.url, self.categories, self.business_info, self.similar)
 
 class Yelp:
 	def __init__(self):
@@ -81,6 +88,8 @@ class Yelp:
 		address = r_obj['location'].get('display_address', '')
 		phone = r_obj.get('display_phone', '')
 		price = r_obj.get('price', '')
+		rating = r_obj.get('rating', 0.0)
+		name = r_obj.get('name', '')
 		response = requests.get(url)
 		html = response.text
 		soup = BeautifulSoup(html, 'html.parser')
@@ -140,7 +149,7 @@ class Yelp:
 			similar = ','.join(similar_list)
 		except:
 			pass
-		return Restaurant(id, desc, address, phone, price, hours, url, categories, business_info, similar)
+		return Restaurant(id, name, rating, desc, address, phone, price, hours, url, categories, business_info, similar)
 
 	def query(self, terms):
 		aliases = []
@@ -164,24 +173,49 @@ class Yelp:
 		result = self.search(url_params)
 		cur = self.conn.cursor()
 		restaurants = []
+		json_obj = []
 		for el in result['businesses']:
 			print(el['id'], el['url'],  el['name'])		
 			# check DB
 			cur.execute('SELECT * FROM Restaurants WHERE Id=?', tuple([el['id']]))
 			results = cur.fetchall()
 			# not cached
+			info = None
 			if len(results):
-				restaurant = Restaurant(results[0])
-				restaurants.append(restaurant)
+				info = Restaurant(results[0])
+				restaurants.append(info)
 			else:
 				info = self.scrape_page(el)
+				restaurants.append(info)
+			# save to cache & db
+			print(info.insert_str())
+			cur.execute(info.insert_str())
+			json_obj.append({
+				'Id':info.id,
+				'Name': info.id, 
+				'Rating': info.rating,
+				'Address': info.address,
+				'Phone': info.phone,
+				'Categories': info.categories,
+				'Url': info.url,
+				'Price': info.price,
+				'Hours': info.hours,
+				'Desc': info.desc,
+				'BusinessInfo': info.business_info,
+				'Similar': info.similar
+				})
+		self.conn.commit()
+		with open('YELP.txt', 'w') as outfile:
+			json.dump(json_obj, outfile)
 		return result
 
 if __name__ == "__main__":
 	yelp_obj = Yelp()
 	query = ''
-	while query != 'exit':
+	while True:
 		query = input('Enter a query: ')
+		if query.lower() == 'exit':
+			exit()
 		result = yelp_obj.query(query.lower())
 	"""
 		response format
@@ -189,54 +223,54 @@ if __name__ == "__main__":
 			region:
 			total: // # results
 			business: [ // result
-			        {
-			            "review_count": 78,
-			            "distance": 883.5332292665596,
-			            "id": "6bI31ExV1CGYoy4TGHonnQ",
-			            "transactions": [
-			                "restaurant_reservation"
-			            ],
-			            "location": {
-			                "display_address": [
-			                    "1220 S University Ave",
-			                    "Ann Arbor, MI 48104"
-			                ],
-			                "zip_code": "48104",
-			                "country": "US",
-			                "address3": "",
-			                "address1": "1220 S University Ave",
-			                "city": "Ann Arbor",
-			                "state": "MI",
-			                "address2": null
-			            },
-			            "image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/htx5ywsBX2DDreN-FapkNA/o.jpg",
-			            "phone": "+17347477006",
-			            "is_closed": false,
-			            "coordinates": {
-			                "latitude": 42.274783,
-			                "longitude": -83.7333166
-			            },
-			            "display_phone": "(734) 747-7006",
-			            "categories": [
-			                {
-			                    "title": "Vietnamese",
-			                    "alias": "vietnamese"
-			                },
-			                {
-			                    "title": "Korean",
-			                    "alias": "korean"
-			                },
-			                {
-			                    "title": "Chinese",
-			                    "alias": "chinese"
-			                }
-			            ],
-			            "price": "$$",
-			            "name": "One Bowl Asian Cuisine",
-			            "alias": "one-bowl-asian-cuisine-ann-arbor-4",
-			            "url": "https://www.yelp.com/biz/one-bowl-asian-cuisine-ann-arbor-4?adjust_creative=d8cdkIwLqRYYmGxRKHTmaQ&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=d8cdkIwLqRYYmGxRKHTmaQ",
-			            "rating": 4.0
-        		},
+					{
+						"review_count": 78,
+						"distance": 883.5332292665596,
+						"id": "6bI31ExV1CGYoy4TGHonnQ",
+						"transactions": [
+							"restaurant_reservation"
+						],
+						"location": {
+							"display_address": [
+								"1220 S University Ave",
+								"Ann Arbor, MI 48104"
+							],
+							"zip_code": "48104",
+							"country": "US",
+							"address3": "",
+							"address1": "1220 S University Ave",
+							"city": "Ann Arbor",
+							"state": "MI",
+							"address2": null
+						},
+						"image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/htx5ywsBX2DDreN-FapkNA/o.jpg",
+						"phone": "+17347477006",
+						"is_closed": false,
+						"coordinates": {
+							"latitude": 42.274783,
+							"longitude": -83.7333166
+						},
+						"display_phone": "(734) 747-7006",
+						"categories": [
+							{
+								"title": "Vietnamese",
+								"alias": "vietnamese"
+							},
+							{
+								"title": "Korean",
+								"alias": "korean"
+							},
+							{
+								"title": "Chinese",
+								"alias": "chinese"
+							}
+						],
+						"price": "$$",
+						"name": "One Bowl Asian Cuisine",
+						"alias": "one-bowl-asian-cuisine-ann-arbor-4",
+						"url": "https://www.yelp.com/biz/one-bowl-asian-cuisine-ann-arbor-4?adjust_creative=d8cdkIwLqRYYmGxRKHTmaQ&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=d8cdkIwLqRYYmGxRKHTmaQ",
+						"rating": 4.0
+				},
 			]
 		}
 	"""

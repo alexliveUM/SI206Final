@@ -12,6 +12,8 @@ conn.commit()
 cur.execute(''' 
 	CREATE TABLE 'Restaurants'(
 		'Id' TEXT PRIMARY KEY,
+		'Name' TEXT,
+		'Rating' REAL,
 		'Description' TEXT,
 		'Address' TEXT,
 		'Phone' TEXT,
