@@ -39,7 +39,7 @@ cur.execute('''
 		'Text' TEXT,
 		'Date' TEXT,
 		'Retweets' INTEGER,
-		'Favroties' INTEGER,
+		'Favorities' INTEGER,
 		'Score' INTEGER,
 		FOREIGN KEY (RestaurantId) REFERENCES Restaurants(Id)
 		)
