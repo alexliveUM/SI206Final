@@ -98,11 +98,12 @@ class FakeRestaurant:
 		self.id = id
 		self.name = name
 
-if __name__ == "__main__":
-	twitter_inst = Twitter()
-	restaurant_inst = FakeRestaurant('Cosorw3lyBJYArC0pUNbqQ', 'Cardamom') # real data
-	print('Init...')
-	twitter_inst.get_restaurant_tweets(restaurant_inst, 20)
-	print('Resetting...')
-	twitter_inst.get_restaurant_tweets(restaurant_inst, 20, True)
+# if __name__ == "__main__":
+# 	exit(1)
+# 	twitter_inst = Twitter()
+# 	restaurant_inst = FakeRestaurant('Cosorw3lyBJYArC0pUNbqQ', 'Cardamom') # real data
+# 	print('Init...')
+# 	twitter_inst.get_restaurant_tweets(restaurant_inst, 20)
+# 	print('Resetting...')
+# 	twitter_inst.get_restaurant_tweets(restaurant_inst, 20, True)
 
