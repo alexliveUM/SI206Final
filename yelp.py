@@ -18,11 +18,17 @@ class Restaurant:
 		self.phone = phone
 		self.categories = categories
 		self.url = url
-		self.price = len(price)
+		if isinstance(price, str):
+			self.price = len(price)
+		else:
+			self.price = price
 		self.hours = hours
 		self.desc = desc
 		self.business_info = business_info
 		self.similar = similar
+
+	def __str__(self):
+		return '[{}] {} ({})'.format(self.id, self.name, self.rating)
 
 	def insert_str(self):
 		return '''
@@ -65,7 +71,7 @@ class Yelp:
 		print(u'Querying {0}...'.format(url))
 
 		response = requests.request('GET', url, headers=headers, params=url_params)
-
+		print(response.json())
 		return response.json()
 
 	def search(self, url_params):
@@ -78,14 +84,18 @@ class Yelp:
 		"""
 		return self.request(self.API_HOST, self.SEARCH_PATH, self.API_KEY, url_params=url_params)
 
-	def get(self, id):
-		pass
+	def get_restaurant(self, id):
+		cur = self.conn.cursor()
+		cur.execute('SELECT * FROM Restaurants WHERE Id=?', (id,))
+		results = cur.fetchall()
+		return results
 
 	def scrape_page(self, r_obj):
 		id = r_obj['id']
 		name = r_obj.get('name', '')
 		url = r_obj.get('url', '')
-		address = r_obj['location'].get('display_address', '')
+		address = r_obj['location'].get('display_address', [])
+		address = ' '.join(address)
 		phone = r_obj.get('display_phone', '')
 		price = r_obj.get('price', '')
 		rating = r_obj.get('rating', 0.0)
@@ -155,6 +165,7 @@ class Yelp:
 		aliases = []
 		invalid = []
 		categories = terms.split()
+		print('@@@ Query:', categories)
 		for category in categories:
 			if category in self.categories:
 				aliases.append(self.categories[category])
@@ -163,11 +174,11 @@ class Yelp:
 		if len(invalid):
 			print('Following categories in search are invalid. Query constructed withouth these terms:')
 			for el in invalid:
-				print(el)
+				print('\t{}'.format(el))
 		url_params = {
 			'term':'food,restaurants',
 			'location': 48104,
-			'radius': 8000,
+			'radius': 10000,
 			'categories': ','.join(aliases)
 		}
 		result = self.search(url_params)
@@ -175,39 +186,43 @@ class Yelp:
 		restaurants = []
 		json_obj = []
 		for el in result['businesses']:
-			print(el['id'], el['url'],  el['name'])		
+			print(' - Result', el['id'], el['url'],  el['name'])		
 			# check DB
-			cur.execute('SELECT * FROM Restaurants WHERE Id=?', tuple([el['id']]))
-			results = cur.fetchall()
-			# not cached
+			results = self.get_restaurant(el['id'])
+			# cur.execute('SELECT * FROM Restaurants WHERE Id=?', tuple([el['id']]))
+			# results = cur.fetchall()
+			# # not cached
 			info = None
 			if len(results):
-				info = Restaurant(results[0])
+				print('$$$ Present in DB!')
+				rid, rname, rrating, rdesc, raddress, rphone, rprice, rhours, rurl, rcategories, rbusiness_info, rsimilar = results[0]
+				info = Restaurant(rid, rname, rrating, rdesc, raddress, rphone, rprice, rhours, rurl, rcategories, rbusiness_info, rsimilar)
 				restaurants.append(info)
 			else:
+				print('*** Scraping page!')
 				info = self.scrape_page(el)
 				restaurants.append(info)
-			# save to cache & db
-			print(info.insert_str())
-			cur.execute(info.insert_str())
-			json_obj.append({
-				'Id':info.id,
-				'Name': info.id, 
-				'Rating': info.rating,
-				'Address': info.address,
-				'Phone': info.phone,
-				'Categories': info.categories,
-				'Url': info.url,
-				'Price': info.price,
-				'Hours': info.hours,
-				'Desc': info.desc,
-				'BusinessInfo': info.business_info,
-				'Similar': info.similar
-				})
-		self.conn.commit()
-		with open('YELP.txt', 'w') as outfile:
+				# save to cache & db
+				print(info.insert_str())
+				cur.execute(info.insert_str())
+				json_obj.append({
+					'Id':info.id,
+					'Name': info.id, 
+					'Rating': info.rating,
+					'Address': info.address,
+					'Phone': info.phone,
+					'Categories': info.categories,
+					'Url': info.url,
+					'Price': info.price,
+					'Hours': info.hours,
+					'Desc': info.desc,
+					'BusinessInfo': info.business_info,
+					'Similar': info.similar
+					})
+				self.conn.commit()
+		with open('cache/YELP.txt', 'w') as outfile:
 			json.dump(json_obj, outfile)
-		return result
+		return restaurants
 
 if __name__ == "__main__":
 	yelp_obj = Yelp()

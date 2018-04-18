@@ -1,0 +1,7 @@
+<h1>What Eat?</h1>
+
+<p>{{ request_method }}</p>
+
+{% for el in restaurants %}
+<p><a href="{{ el.url }}">[{{ el.id }}] {{ el.name }} ({{ el.rating }})</a></p>
+{% endfor %}
