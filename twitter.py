@@ -15,7 +15,7 @@ class Tweet:
 	def __init__(self, restaurant_id, tweet_dict_from_json=None, db_line=None):
 		self.restaurant_id = restaurant_id
 		if tweet_dict_from_json:
-			self.text = tweet_dict_from_json['text']
+			self.text = tweet_dict_from_json['text'].replace('"', "'")
 			self.username = tweet_dict_from_json['user']['screen_name']
 			self.creation_date = tweet_dict_from_json['created_at']
 			self.num_retweets = tweet_dict_from_json['retweet_count']
@@ -44,6 +44,13 @@ class Twitter:
 		requests.get(self.url, auth=self.auth)
 		self.conn = sqlite3.connect('SI206DB.db')
 		
+	def writeToCache(self, data):
+		print('### Updating TWEETS cache ###')
+		cache_obj = open('cache/TWEETS.txt', 'w')
+		json.dump(data, cache_obj, indent=2)
+		print('### Cache updated to {} items ###'.format(len(data)))
+		cache_obj.close()
+
 	def check_db(self, key, count):
 		cur = self.conn.cursor()
 		cur.execute('SELECT * FROM Tweets WHERE RestaurantId="{}" ORDER BY "Score" DESC'.format(key.id))
@@ -53,38 +60,45 @@ class Twitter:
 			cache.append(Tweet(key.id, db_line=result))
 		return cache
 
-	def get_restaurant_tweets(self, key, count=20, reset=False):
+	def get_restaurant_tweets(self, key, count=25, reset=False):
+		# load existing tweets for restaurant
 		results = self.check_db(key, count)
 		base_url = 'https://api.twitter.com/1.1/search/tweets.json'
+		cache = {}
 		try:
 			file_obj = open('cache/TWEETS.txt', 'r')
 			file_data = file_obj.read()
-			data = json.loads(file_data)
+			cache = json.loads(file_data)
 			file_obj.close()
 		except:
 			pass
 		cur = self.conn.cursor()
 		if reset == True or len(results) == 0:
 			# request
-			print('@@@ Requesting {} @@@'.format(key.name.lower()))
+			print('@@@ TWEET: Requesting {} @@@'.format(key.name.lower()))
 			params = {
 				'q': key.name.lower(),
-				'count':100
-			 }
+				'count': 50
+			}
 			response = requests.get(base_url, auth=self.auth, params=params)
 			data = json.loads(response.text)
+			# results = list of Tweets, valid_tweets = list of tweet objects for cache
 			print('Tweets fetched: {}'.format(len(data['statuses'])))
 			results = []
-			for tweet in data['statuses']:
-				print(tweet['id'])
-				if 'rt' not in tweet['text'].lower():
-					results.append(Tweet(key.id, tweet_dict_from_json=tweet))
+			valid_tweets = []
+			for el in data['statuses']:
+				if 'rt' not in el['text'].lower():
+					valid_tweets.append(el)
+					results.append(Tweet(key.id, tweet_dict_from_json=el))
 					print(results[-1].id)
 				if len(results) == count:
 					break
+			# add to cache
+			cache[key.id] = valid_tweets
 			# update cache & db
-			with open('cache/TWEETS.txt', 'w') as outfile:
-				json.dump(data, outfile)
+			self.writeToCache(cache)
+			# clear out stale tweets
+			cur.execute('DELETE FROM Tweets WHERE RestaurantId=?',(key.id,))
 			for result in results:
 				try:
 					result.insert_str(cur)
@@ -93,14 +107,6 @@ class Twitter:
 			self.conn.commit()
 		else:
 			results = results[0:count]
-			for result in results:
-				print(result.id)
 		# sort results
 		sorted_results = sorted(results, key=lambda x: x.popularity_score, reverse=True)
 		return sorted_results
-
-# # class mimicing yelp.Restaurant
-# class FakeRestaurant:
-# 	def __init__(self, id, name):
-# 		self.id = id
-# 		self.name = name

@@ -41,9 +41,6 @@ def home_route():
 		# if no errors
 		if len(error_msg) == 0:
 			results, invalid = yelp_inst.query(ui_categories, ui_location, ui_radius, ui_sort)
-			print('POST -> Home:',results)
-			for result in results:
-				print('\t',result)
 			return render_template('index.html', error_msg=error_msg, invalid=invalid,restaurants=results)
 	# get
 	return render_template('index.html', error_msg=error_msg)
@@ -70,7 +67,7 @@ def restaurant_route(r_id):
 	if restaurant.business_info == '':
 		restaurant.business_info = []
 	else:
-		restaurant.business_info = restaurant.business_info.strip().split(',')
+		restaurant.business_info = restaurant.business_info.split(',')
 	if restaurant.similar == '':
 		restaurant.similar = []
 	else:

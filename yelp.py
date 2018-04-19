@@ -12,7 +12,7 @@ import secrets
 class Restaurant:
 	def __init__(self, id, name, rating, desc, address, phone, price, hours, url, categories, business_info, similar):
 		self.id = id
-		self.name = name.replace('"', '')
+		self.name = name.replace('"', "'")
 		self.rating = rating
 		self.address = address
 		self.phone = phone
@@ -23,7 +23,7 @@ class Restaurant:
 		else:
 			self.price = price
 		self.hours = hours
-		self.desc = desc.replace('"', '')
+		self.desc = desc.replace('"', "'")
 		self.business_info = business_info
 		self.similar = similar
 
@@ -74,7 +74,6 @@ class Yelp:
 		print(u'Querying {0}...'.format(url))
 
 		response = requests.request('GET', url, headers=headers, params=url_params)
-		print(response.json())
 		return response.json()
 
 	def search(self, url_params):
@@ -86,6 +85,13 @@ class Yelp:
 			dict: The JSON response from the request.
 		"""
 		return self.request(self.API_HOST, self.SEARCH_PATH, self.API_KEY, url_params=url_params)
+
+	def writeToCache(self, data):
+		print('### Updating YELP cache ###')
+		cache_obj = open('cache/YELP.txt', 'w')
+		json.dump(data, cache_obj, indent=2)
+		print('### Cache updated to {} items ###'.format(len(data)))
+		cache_obj.close()
 
 	# Checks DB for restaurant ID
 	# Input: restaurant id (str)
@@ -232,6 +238,7 @@ class Yelp:
 				self.conn.commit()
 			# save to cache
 			if info.id not in json_obj and html == '':
+				print('Creating cache entry...')
 				info, html = self.scrape_page(el)
 				json_obj[info.id] = {
 					'Name': info.id, 
@@ -248,18 +255,8 @@ class Yelp:
 					'HTML': html
 					}
 		# dump to cache 
-		with open('cache/YELP.txt', 'w') as outfile:
-			json.dump(json_obj, outfile)
+		self.writeToCache(json_obj)
 		return (restaurants, invalid)
-
-# if __name__ == "__main__":
-# 	yelp_obj = Yelp()
-# 	query = ''
-# 	while True:
-# 		query = input('Enter a query: ')
-# 		if query.lower() == 'exit':
-# 			exit()
-# 		result = yelp_obj.query(query.lower())
 
 """
 	Yelp API response format

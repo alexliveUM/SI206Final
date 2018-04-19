@@ -34,7 +34,7 @@ def run():
 	# create
 	cur.execute(''' 
 		CREATE TABLE 'Tweets'(
-			'Id' TEXT PRIMARY KEY,
+			'Id' TEXT,
 			'RestaurantId' TEXT,
 			'Username' TEXT,
 			'Text' TEXT,
