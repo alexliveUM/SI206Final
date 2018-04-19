@@ -56,6 +56,13 @@ class Twitter:
 	def get_restaurant_tweets(self, key, count=20, reset=False):
 		results = self.check_db(key, count)
 		base_url = 'https://api.twitter.com/1.1/search/tweets.json'
+		try:
+			file_obj = open('cache/TWEETS.txt', 'r')
+			file_data = file_obj.read()
+			data = json.loads(file_data)
+			file_obj.close()
+		except:
+			pass
 		cur = self.conn.cursor()
 		if reset == True or len(results) == 0:
 			# request
@@ -76,7 +83,7 @@ class Twitter:
 				if len(results) == count:
 					break
 			# update cache & db
-			with open('TWEETS.txt', 'w') as outfile:
+			with open('cache/TWEETS.txt', 'w') as outfile:
 				json.dump(data, outfile)
 			for result in results:
 				try:
@@ -92,18 +99,8 @@ class Twitter:
 		sorted_results = sorted(results, key=lambda x: x.popularity_score, reverse=True)
 		return sorted_results
 
-# class mimicing yelp.Restaurant
-class FakeRestaurant:
-	def __init__(self, id, name):
-		self.id = id
-		self.name = name
-
-# if __name__ == "__main__":
-# 	exit(1)
-# 	twitter_inst = Twitter()
-# 	restaurant_inst = FakeRestaurant('Cosorw3lyBJYArC0pUNbqQ', 'Cardamom') # real data
-# 	print('Init...')
-# 	twitter_inst.get_restaurant_tweets(restaurant_inst, 20)
-# 	print('Resetting...')
-# 	twitter_inst.get_restaurant_tweets(restaurant_inst, 20, True)
-
+# # class mimicing yelp.Restaurant
+# class FakeRestaurant:
+# 	def __init__(self, id, name):
+# 		self.id = id
+# 		self.name = name

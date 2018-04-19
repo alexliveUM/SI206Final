@@ -1,0 +1,149 @@
+<header>
+	<title>What Eat? - {{ restaurant.name }}</title>
+</header>
+
+<style>
+	table, th, td {
+		border: 1px solid black;
+	}
+</style>
+
+<h1>What Eat? - {{ restaurant.name }}</h1>
+
+<table>
+	<col width="200px">
+	{% if restaurant.price != '' %}
+	<tr>
+		<td>
+			Price:
+		</td>
+		<td>
+			{{ restaurant.price}}
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.rating != 0.0%}
+	<tr>
+		<td>
+			Rating:
+		</td>
+		<td>
+			{{ restaurant.rating }}
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.desc != '' %}
+	<tr>
+		<td>
+			Description:
+		</td>
+		<td>
+			{{ restaurant.desc }}
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.address != '' %}
+	<tr>
+		<td>
+			Address:
+		</td>
+		<td>
+			{{ restaurant.address }}
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.phone != '' %}
+	<tr>
+		<td>
+			Phone:
+		</td>
+		<td>
+			{{ restaurant.phone }}
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.categories|length > 0 %}
+	<tr>
+		<td>
+			Categories:
+		</td>
+		<td>
+			<ul>
+				{% for category in restaurant.categories %}
+					<li>{{ category }}</li>
+				{% endfor %}
+			</ul>
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.similar|length > 0 %}
+	<tr>
+		<td>
+			Hours:
+		</td>
+		<td>
+			<ul>
+			{% for hour in restaurant.hours %}
+				<li>{{ hour }}</li>
+			{% endfor %}
+			</ul>
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.business_info|length != 0 %}
+	<tr>
+		<td>
+			Business Info:
+		</td>
+		<td>
+			<ul>
+			{% for bus in restaurant.business_info %}
+				<li>{{ bus }}</li>
+			{% endfor %}
+			</ul>
+		</td>
+	</tr>
+	{% endif %}
+	{% if restaurant.similar|length > 0 %}
+	<tr>
+		<td>
+			Similar Restaurants:
+		</td>
+		<td>
+			<ul>
+			{% for rest in restaurant.similar %}
+				<li>{{ rest }}</li>
+			{% endfor %}
+			</ul>
+		</td>
+	</tr>
+	{% endif %}
+	<tr>
+		<td>
+			URL:
+		</td>
+		<td>
+			{{ restaurant.url }}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			ID:
+		</td>
+		<td>
+			{{ restaurant.id }}
+		</td>
+	</tr>
+</table>
+
+<h3>Tweets about {{ restaurant.name }}</h3>
+<form method="POST">
+    <input type="submit" name="refresh" value="Refresh"/>
+</form>
+<table>
+	{% for tweet in tweets %}
+		<tr><td>
+			{{ tweet }}
+		</td></tr>
+	{% endfor %}
+</table>

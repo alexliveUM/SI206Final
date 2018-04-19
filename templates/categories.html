@@ -1,0 +1,12 @@
+<header>
+	<title>What Eat? - Categories</title>
+</header>
+
+<h1>What Eat? - Categories</h1>
+
+<p>The following is a list of valid categories. They are not case-sensitive and only apply to the 'Categories' portion of the form on the <a href="/">Home Page</a>.</p>
+<ul>
+{% for category in categories %}
+	<li>{{ category }}</li>
+{% endfor %}
+</ul>

@@ -1,7 +1,94 @@
+<header>
+	<title>What Eat?</title>
+</header>
+
 <h1>What Eat?</h1>
 
-<p>{{ request_method }}</p>
+<div id="description">
+	<h4>Required Fields:</h4>
+	<ul>
+		<li>
+			<strong>Categories:</strong>
+			Required field. These should be space separated. For example, to query for 'Indian' and 'Diners', enter 'Indian Diners'. For a list of valid categories, go to <a href="/categories">Categories</a>.
+		</li>
+		<li>
+			<strong>Location:</strong>
+			Required field. Specify a city, state, or country.
+			</li>
+	</ul>
+	<h4>Optional Fields:</h4>
+	<ul>
+		<li>
+			<strong>Radius:</strong>
+			Optional. Search radius in meters. Default is set to 10 kilometers (10000), with a max possible value of 40 kilometers (40000).
+		</li>
+	</ul>
+</div>
 
-{% for el in restaurants %}
-<p><a href="{{ el.url }}">[{{ el.id }}] {{ el.name }} ({{ el.rating }})</a></p>
+<br>
+
+{% if error_msg %}
+<p>Errors</p>
+<ul>
+{% for error in error_msg %}
+<li>{{ error }}</li>
 {% endfor %}
+</ul>
+{% endif %}
+
+<form method="POST">
+	<table>
+		<tr>
+			<td>Categories:</td>
+			<td><input id="ui_categories" type="text" name="ui_categories"></td>
+		</tr>
+		<tr>
+			<td>Location: </td>
+			<td><input id="ui_location" type="text" name="ui_location"></td>
+		</tr>
+		<tr>
+			<td>Radius:</td>
+			<td><input id="ui_radius" type="text" name="ui_radius" value="10000"></td>
+		</tr>
+		<tr>
+			<td>
+			Sort by:
+			</td>
+			<td>
+			    <input type="radio" name="ui_sort" checked="checked" value="distance"/> Distance
+			</td>
+			<td>
+		    	<input type="radio" name="ui_sort" value="best_match"/> Best Match
+			</td>
+		    <td>
+		    	<input type="radio" name="ui_sort" value="rating"/> Rating
+		    </td>
+			<td>
+			    <input type="radio" name="ui_sort" value="review_count"/> Review Count (Yelp)
+			</td>
+		</tr>
+	</table>
+	</br>
+    <input type="submit" name="query" value="Let's Go!"/>
+</form>
+
+{% if invalid %}
+<p>The following categories were invalid. Please see <a href="">Categories</a> for a list of valid categories.</p>
+<ul>
+{% for category in invalid %}
+	<li>category</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if restaurants %}
+<h2>Restaurants:</h2>
+<ul>
+{% for el in restaurants %}
+	<li>
+		<a href="{{ el.url }}" target="_blank">[YELP]</a>
+		<a href="/restaurant/{{ el.id }}" target="_blank">{{ el.name }} ({{ el.rating }})</a>
+	</li>
+{% endfor %}
+</ul>
+{% endif %}

@@ -15,46 +15,74 @@ import init_db
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
-def default_route():
+def home_route():
+	error_msg = []
 	if request.method == 'POST':
-		return render_template('index.html', request_method='POST')
-	else:
 		yelp_inst = yelp.Yelp()
-		results = yelp_inst.query('')
-		print('Default_route:',results)
-		for result in results:
-			print('\t',result)
-		return render_template('index.html', request_method='GET', restaurants=results)
+		ui_categories = ''
+		ui_location = ''
+		ui_radius = 10000
+		ui_sort = 'distance'
+		if 'ui_categories' in request.form and request.form['ui_categories'].strip() != '':
+			ui_categories = request.form['ui_categories']
+		else:
+			error_msg.append('Missing required field: Categories')
+		if 'ui_location' in request.form and request.form['ui_location'].strip() != '':
+			ui_location = request.form['ui_location']
+		else:
+			error_msg.append('Missing required field: Location')
+		if 'ui_radius' in request.form:
+			try:
+				ui_radius = int(request.form['ui_radius'])
+			except:
+				error_msg.append('Error in field: Radius. Please enter a valid number between 1000 and 40000.')
+		if 'ui_sort' in request.form:
+			ui_sort = request.form['ui_sort']
+		# if no errors
+		if len(error_msg) == 0:
+			results, invalid = yelp_inst.query(ui_categories, ui_location, ui_radius, ui_sort)
+			print('POST -> Home:',results)
+			for result in results:
+				print('\t',result)
+			return render_template('index.html', error_msg=error_msg, invalid=invalid,restaurants=results)
+	# get
+	return render_template('index.html', error_msg=error_msg)
 
-@app.route('/name/<word>')
-def name_route(word):
-	story_list_json = get_stories('technology')
-	headlines = get_headlines(story_list_json)
-	return render_template('index.html', name=word, topic='', headlines=[])
-
-@app.route('/headlines/<word>')
-def headlines_route(word):
-	topic = 'technology'
-	story_list_json = get_stories(topic)
-	headlines = get_headlines(story_list_json)
-	return render_template('index.html', name=word, topic=topic, headlines=headlines[:5])
-
-@app.route('/links/<word>')
-def links_route(word):
-	topic = 'technology'
-	story_list_json = get_stories(topic)
-	headlines = get_headlines(story_list_json, True)
-	return render_template('index.html', name=word, topic=topic, headlines=headlines[:5])
-
-@app.route('/choose/<word>', methods = ['GET', 'POST'])
-def choose_route(word):
+@app.route('/restaurant/<r_id>', methods=['GET', 'POST'])
+def restaurant_route(r_id):
+	yelp_inst = yelp.Yelp()
+	twitter_inst = twitter.Twitter()
+	tweets = []
+	reset = False
 	if request.method == 'POST':
-		topic = request.form['user_topic']
+		reset = True
+	restaurant = yelp_inst.get_restaurant(r_id)
+	tweets = twitter_inst.get_restaurant_tweets(restaurant, reset=reset)
+	restaurant.price = restaurant.price * '$'
+	if restaurant.hours == '':
+		restaurant.hours = []
 	else:
-		topic = 'technology'
-	story_list_json = get_stories(topic)
-	headlines = get_headlines(story_list_json, True)
-	return render_template('index.html', name=word, topic=topic, choose=True, headlines=headlines[:5])
+		restaurant.hours = restaurant.hours.split(',')
+	if restaurant.categories == '':
+		restaurant.categories = []
+	else:
+		restaurant.categories = restaurant.categories.split(',')
+	if restaurant.business_info == '':
+		restaurant.business_info = []
+	else:
+		restaurant.business_info = restaurant.business_info.strip().split(',')
+	if restaurant.similar == '':
+		restaurant.similar = []
+	else:
+		restaurant.similar = restaurant.similar.split(',')
+	return render_template('restaurant.html', restaurant=restaurant, tweets=tweets)
+
+@app.route('/categories')
+def categories_route():
+	categories = []
+	yelp_inst = yelp.Yelp()
+	categories = yelp_inst.categories
+	return render_template('categories.html', categories=categories)
 
 if not os.path.exists('SI206DB.db'):
 	init_db.run()

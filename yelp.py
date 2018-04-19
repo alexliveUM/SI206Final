@@ -12,7 +12,7 @@ import secrets
 class Restaurant:
 	def __init__(self, id, name, rating, desc, address, phone, price, hours, url, categories, business_info, similar):
 		self.id = id
-		self.name = name
+		self.name = name.replace('"', '')
 		self.rating = rating
 		self.address = address
 		self.phone = phone
@@ -23,18 +23,21 @@ class Restaurant:
 		else:
 			self.price = price
 		self.hours = hours
-		self.desc = desc
+		self.desc = desc.replace('"', '')
 		self.business_info = business_info
 		self.similar = similar
 
+	# stringify for console output
 	def __str__(self):
 		return '[{}] {} ({})'.format(self.id, self.name, self.rating)
 
+	# generate string to insert this restaurant into 'Restaurants' in DB
 	def insert_str(self):
 		return '''
 			INSERT INTO "Restaurants" VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}")
 		'''.format(self.id, self.name, self.rating, self.desc, self.address, self.phone, self.price, self.hours, self.url, self.categories, self.business_info, self.similar)
 
+# Yelp API search instance
 class Yelp:
 	def __init__(self):
 		self.API_KEY = secrets.yelp_api_key
@@ -84,15 +87,26 @@ class Yelp:
 		"""
 		return self.request(self.API_HOST, self.SEARCH_PATH, self.API_KEY, url_params=url_params)
 
+	# Checks DB for restaurant ID
+	# Input: restaurant id (str)
+	# Return: DB entry for initializing Restaurant object (tuple)
 	def get_restaurant(self, id):
 		cur = self.conn.cursor()
 		cur.execute('SELECT * FROM Restaurants WHERE Id=?', (id,))
 		results = cur.fetchall()
-		return results
+		obj = None
+		if len(results):
+			rid, rname, rrating, rdesc, raddress, rphone, rprice, rhours, rurl, rcategories, rbusiness_info, rsimilar = results[0]
+			obj = Restaurant(rid, rname, rrating, rdesc, raddress, rphone, rprice, rhours, rurl, rcategories, rbusiness_info, rsimilar)			
+		return obj
 
+	# Scrapes Yelp page returned from Yelp business object
+	# Input: restaurant business from Yelp API (json object)
+	# Return: Restaurant object
 	def scrape_page(self, r_obj):
 		id = r_obj['id']
 		name = r_obj.get('name', '')
+		print(' >  Scraping page...{}'.format(name))
 		url = r_obj.get('url', '')
 		address = r_obj['location'].get('display_address', [])
 		address = ' '.join(address)
@@ -138,12 +152,12 @@ class Yelp:
 		business_info = ''
 		try:
 			info_list = []
-			ylist = soup.find('ul', class_='ylist')
+			ylist = soup.find('div', class_='short-def-list')
 			dls = ylist.find_all('dl')
 			for dl in dls:
 				key = dl.find('dt', class_='attribute-key').text.strip()
 				value = dl.find('dd').text.strip()
-				info_list.append('{} - {}'.find(key, value))
+				info_list.append('{} - {}'.format(key, value))
 			business_info = ','.join(info_list)
 		except:
 			pass
@@ -159,54 +173,67 @@ class Yelp:
 			similar = ','.join(similar_list)
 		except:
 			pass
-		return Restaurant(id, name, rating, desc, address, phone, price, hours, url, categories, business_info, similar)
+		return (Restaurant(id, name, rating, desc, address, phone, price, hours, url, categories, business_info, similar), html)
 
-	def query(self, terms):
+	def query(self, ui_terms='', ui_location=48104, ui_radius=10000, ui_sort='distance'):
 		aliases = []
 		invalid = []
-		categories = terms.split()
+		# load from cache
+		json_obj = {}
+		try:
+			file_obj = open('cache/YELP.txt', 'r')
+			file_data = file_obj.read()
+			json_obj = json.loads(file_data)
+			file_obj.close()
+		except:
+			pass
+		# process categories
+		categories = ui_terms.split()
 		print('@@@ Query:', categories)
+		# obtain category mapping
 		for category in categories:
 			if category in self.categories:
 				aliases.append(self.categories[category])
 			else:
 				invalid.append(category)
+		# notify user of invalid categories
 		if len(invalid):
 			print('Following categories in search are invalid. Query constructed withouth these terms:')
 			for el in invalid:
 				print('\t{}'.format(el))
+		# create search query
 		url_params = {
-			'term':'food,restaurants',
-			'location': 48104,
-			'radius': 10000,
-			'categories': ','.join(aliases)
+			'term':'food', # limited to food options only
+			'location': ui_location,
+			'radius': ui_radius,
+			'categories': ','.join(aliases),
+			'limit': 20,
+			'sort_by': ui_sort
 		}
+		# call API
 		result = self.search(url_params)
-		cur = self.conn.cursor()
 		restaurants = []
-		json_obj = []
+		cur = self.conn.cursor()
 		for el in result['businesses']:
 			print(' - Result', el['id'], el['url'],  el['name'])		
+			html = ''
 			# check DB
-			results = self.get_restaurant(el['id'])
-			# cur.execute('SELECT * FROM Restaurants WHERE Id=?', tuple([el['id']]))
-			# results = cur.fetchall()
-			# # not cached
-			info = None
-			if len(results):
+			info = self.get_restaurant(el['id'])
+			if info != None:
 				print('$$$ Present in DB!')
-				rid, rname, rrating, rdesc, raddress, rphone, rprice, rhours, rurl, rcategories, rbusiness_info, rsimilar = results[0]
-				info = Restaurant(rid, rname, rrating, rdesc, raddress, rphone, rprice, rhours, rurl, rcategories, rbusiness_info, rsimilar)
 				restaurants.append(info)
 			else:
 				print('*** Scraping page!')
-				info = self.scrape_page(el)
+				info, html = self.scrape_page(el)
 				restaurants.append(info)
-				# save to cache & db
+				# save to db
 				print(info.insert_str())
 				cur.execute(info.insert_str())
-				json_obj.append({
-					'Id':info.id,
+				self.conn.commit()
+			# save to cache
+			if info.id not in json_obj and html == '':
+				info, html = self.scrape_page(el)
+				json_obj[info.id] = {
 					'Name': info.id, 
 					'Rating': info.rating,
 					'Address': info.address,
@@ -217,75 +244,77 @@ class Yelp:
 					'Hours': info.hours,
 					'Desc': info.desc,
 					'BusinessInfo': info.business_info,
-					'Similar': info.similar
-					})
-				self.conn.commit()
+					'Similar': info.similar,
+					'HTML': html
+					}
+		# dump to cache 
 		with open('cache/YELP.txt', 'w') as outfile:
 			json.dump(json_obj, outfile)
-		return restaurants
+		return (restaurants, invalid)
 
-if __name__ == "__main__":
-	yelp_obj = Yelp()
-	query = ''
-	while True:
-		query = input('Enter a query: ')
-		if query.lower() == 'exit':
-			exit()
-		result = yelp_obj.query(query.lower())
-	"""
-		response format
-		{
-			region:
-			total: // # results
-			business: [ // result
-					{
-						"review_count": 78,
-						"distance": 883.5332292665596,
-						"id": "6bI31ExV1CGYoy4TGHonnQ",
-						"transactions": [
-							"restaurant_reservation"
+# if __name__ == "__main__":
+# 	yelp_obj = Yelp()
+# 	query = ''
+# 	while True:
+# 		query = input('Enter a query: ')
+# 		if query.lower() == 'exit':
+# 			exit()
+# 		result = yelp_obj.query(query.lower())
+
+"""
+	Yelp API response format
+	{
+		region:
+		total: // # results
+		business: [ // result
+				{
+					"review_count": 78,
+					"distance": 883.5332292665596,
+					"id": "6bI31ExV1CGYoy4TGHonnQ",
+					"transactions": [
+						"restaurant_reservation"
+					],
+					"location": {
+						"display_address": [
+							"1220 S University Ave",
+							"Ann Arbor, MI 48104"
 						],
-						"location": {
-							"display_address": [
-								"1220 S University Ave",
-								"Ann Arbor, MI 48104"
-							],
-							"zip_code": "48104",
-							"country": "US",
-							"address3": "",
-							"address1": "1220 S University Ave",
-							"city": "Ann Arbor",
-							"state": "MI",
-							"address2": null
+						"zip_code": "48104",
+						"country": "US",
+						"address3": "",
+						"address1": "1220 S University Ave",
+						"city": "Ann Arbor",
+						"state": "MI",
+						"address2": null
+					},
+					"image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/htx5ywsBX2DDreN-FapkNA/o.jpg",
+					"phone": "+17347477006",
+					"is_closed": false,
+					"coordinates": {
+						"latitude": 42.274783,
+						"longitude": -83.7333166
+					},
+					"display_phone": "(734) 747-7006",
+					"categories": [
+						{
+							"title": "Vietnamese",
+							"alias": "vietnamese"
 						},
-						"image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/htx5ywsBX2DDreN-FapkNA/o.jpg",
-						"phone": "+17347477006",
-						"is_closed": false,
-						"coordinates": {
-							"latitude": 42.274783,
-							"longitude": -83.7333166
+						{
+							"title": "Korean",
+							"alias": "korean"
 						},
-						"display_phone": "(734) 747-7006",
-						"categories": [
-							{
-								"title": "Vietnamese",
-								"alias": "vietnamese"
-							},
-							{
-								"title": "Korean",
-								"alias": "korean"
-							},
-							{
-								"title": "Chinese",
-								"alias": "chinese"
-							}
-						],
-						"price": "$$",
-						"name": "One Bowl Asian Cuisine",
-						"alias": "one-bowl-asian-cuisine-ann-arbor-4",
-						"url": "https://www.yelp.com/biz/one-bowl-asian-cuisine-ann-arbor-4?adjust_creative=d8cdkIwLqRYYmGxRKHTmaQ&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=d8cdkIwLqRYYmGxRKHTmaQ",
-						"rating": 4.0
-				},
-			]
-		}
-	"""
+						{
+							"title": "Chinese",
+							"alias": "chinese"
+						}
+					],
+					"price": "$$",
+					"name": "One Bowl Asian Cuisine",
+					"alias": "one-bowl-asian-cuisine-ann-arbor-4",
+					"url": "https://www.yelp.com/biz/one-bowl-asian-cuisine-ann-arbor-4?adjust_creative=d8cdkIwLqRYYmGxRKHTmaQ&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=d8cdkIwLqRYYmGxRKHTmaQ",
+					"rating": 4.0
+			},
+		]
+	}
+"""
