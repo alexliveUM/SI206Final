@@ -51,7 +51,7 @@ class Twitter:
 		print('### Cache updated to {} items ###'.format(len(data)))
 		cache_obj.close()
 
-	def check_db(self, key, count):
+	def check_db(self, key):
 		cur = self.conn.cursor()
 		cur.execute('SELECT * FROM Tweets WHERE RestaurantId="{}" ORDER BY "Score" DESC'.format(key.id))
 		results = cur.fetchall()
@@ -62,7 +62,7 @@ class Twitter:
 
 	def get_restaurant_tweets(self, key, count=25, reset=False):
 		# load existing tweets for restaurant
-		results = self.check_db(key, count)
+		results = self.check_db(key)
 		base_url = 'https://api.twitter.com/1.1/search/tweets.json'
 		cache = {}
 		try:

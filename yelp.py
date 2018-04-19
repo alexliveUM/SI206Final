@@ -223,6 +223,7 @@ class Yelp:
 		for el in result['businesses']:
 			print(' - Result', el['id'], el['url'],  el['name'])		
 			html = ''
+			add_cache = False
 			# check DB
 			info = self.get_restaurant(el['id'])
 			if info != None:
@@ -230,6 +231,7 @@ class Yelp:
 				restaurants.append(info)
 			else:
 				print('*** Scraping page!')
+				add_cache = True
 				info, html = self.scrape_page(el)
 				restaurants.append(info)
 				# save to db
@@ -237,7 +239,7 @@ class Yelp:
 				cur.execute(info.insert_str())
 				self.conn.commit()
 			# save to cache
-			if info.id not in json_obj and html == '':
+			if add_cache or (info.id not in json_obj and html == ''):
 				print('Creating cache entry...')
 				info, html = self.scrape_page(el)
 				json_obj[info.id] = {
